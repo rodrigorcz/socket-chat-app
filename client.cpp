@@ -2,16 +2,53 @@
 #include <thread>
 #include <mutex>
 #include <cstring>
+#include <string.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 
 #define PORT 8080
+#define BUFFER_SIZE 1024
 
-int main() {
+char name_client[BUFFER_SIZE];
+
+void send_messages(int client_socket){
+    char buffer[BUFFER_SIZE];
+    while(true){
+        std::cin.getline(buffer, BUFFER_SIZE);
+        if(!strcmp(buffer, "exit")){            
+            close(client_socket);
+            exit(0);
+        };
+
+        char aux[BUFFER_SIZE];
+        strcpy(aux, name_client);
+
+        strcat(strcat(aux, ": "), buffer);
+        send(client_socket, aux, strlen(aux), 0);
+    }
+}
+
+void receive_messages(int client_socket){
+    char buffer[BUFFER_SIZE];
+    while(true){
+        memset(buffer, 0, sizeof(buffer));
+        int bytes_received = recv(client_socket, buffer, sizeof(buffer), 0);
+        if(bytes_received > 0){
+            std::cout << buffer << std::endl;
+        }else if(bytes_received == 0){
+            std::cout << "Cliente desconectado." << std::endl;
+            close(client_socket);
+            exit(0);
+        }
+    }
+}
+
+int main(){
     int client_socket = 0;
-    char buffer[1024];
-
+    std::cout << "Insira seu nome: " << std::endl;
+    std::cin.getline(name_client, BUFFER_SIZE);
+    
     client_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(client_socket < 0){
         perror("Falha ao criar o socket");
@@ -22,7 +59,7 @@ int main() {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(PORT);
     
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0){
+    if(inet_pton(AF_INET, "172.20.15.72", &serv_addr.sin_addr) <= 0){
         perror("Endereço inválido/não suportado");
         exit(EXIT_FAILURE);
     }
@@ -32,30 +69,13 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    while(1){
-        std::cout << ">";
-        std::string msg;
+    std::cout << "\n----------------------------------\nConectado ao Servidor!\n----------------------------------" << std::endl;
 
-        getline(std::cin, msg);
-        memset(&buffer, 0, sizeof(buffer));
-        strcpy(buffer, msg.c_str());
+    std::thread send_thread(send_messages, client_socket);
+    std::thread receive_thread(receive_messages, client_socket);
 
-        if(msg == "exit"){
-            send(client_socket, (char*)&buffer, strlen(buffer), 0);
-            break;
-        }
-
-        send(client_socket, (char*)&buffer, strlen(buffer), 0);
-        memset(&buffer, 0, sizeof(buffer));
-        recv(client_socket, (char*)&buffer, sizeof(buffer), 0);
-
-        if(!strcmp(buffer, "exit")){
-            std::cout << "Desligando..." << std::endl;
-            break;
-        }
-
-        std::cout << "Server: " << buffer << std::endl;
-    }
+    send_thread.join();
+    receive_thread.join();
 
     close(client_socket);
 

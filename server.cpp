@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
+#include <vector>
 #include <cstring>
 #include <sys/socket.h>
 #include <sys/socket.h>
@@ -9,7 +10,10 @@
 
 #define PORT 8080
 
-// server = socket + bind + listen + accept
+std::vector<int> clients;
+std::mutex mutex_clt;
+
+void rotine_client(int client_socket);
 
 int main(){
     char buffer[1024];
@@ -44,45 +48,61 @@ int main(){
     }
 
     int addrlen = sizeof(server_address);
-    int new_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
-    if(new_socket < 0) {
-        perror("Falha no accept");
-        exit(EXIT_FAILURE);
-    }
-
-    int bytes_read = 0;
-
-    while(1){
-        memset(&buffer, 0, sizeof(buffer));
-
-        recv(new_socket, (char*)&buffer, sizeof(buffer), 0);
-
-        if(!strcmp(buffer, "exit")){
-            std::cout << "Fim da sessão..." << std::endl;
-            break;
-        }
-        
-        std::cout << "Cliente: " << buffer << std::endl;
-        std::cout << ">";
-
-        std::string msg;
-        getline(std::cin, msg);
-
-        memset(&buffer, 0, sizeof(buffer));
-
-        strcpy(buffer, msg.c_str());
-        if(msg == "exit"){
-            send(new_socket, (char*)&buffer, strlen(buffer), 0);
-            break;
+    while(true){
+        int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
+        if(client_socket < 0){
+            perror("Falha no accept");
+            continue;
         }
 
-        send(new_socket, (char*)&buffer, strlen(buffer), 0);
+        mutex_clt.lock();
+        clients.push_back(client_socket);
+        mutex_clt.unlock();
+
+
+        std::thread client_thread(rotine_client, client_socket);
+        client_thread.detach();  
     }
 
-    close(new_socket);
     close(server_socket);
 
     return 0;
+}
+
+
+void rotine_client(int client_socket){
+    char buffer[1024];
+    while (true){
+        memset(buffer, 0, sizeof(buffer));
+        int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
+
+        if(bytes_read > 0){
+            std::cout << "Mensagem do cliente: " << buffer << std::endl;
+
+            mutex_clt.lock();
+            for (auto client : clients) {
+                if (client != client_socket) {
+                    send(client, buffer, bytes_read, 0);
+                }
+            }
+            mutex_clt.unlock();
+
+        }else if(bytes_read == 0){
+            std::cout << "Cliente desconectado." << std::endl;
+            close(client_socket);
+
+            mutex_clt.lock();
+            for(size_t i = 0; i < clients.size(); ++i){
+                if(clients[i] == client_socket){
+                    clients[i] = -1;  
+                    break;
+                }
+            }
+            mutex_clt.lock();
+
+            break;
+        }
+    }
 }
 
 
