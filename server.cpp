@@ -2,7 +2,9 @@
 #include <thread>
 #include <mutex>
 #include <vector>
+#include <ctime> 
 #include <cstring>
+#include <cstdlib>
 #include <sys/socket.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -15,7 +17,13 @@ std::mutex mutex_clt;
 
 void rotine_client(int client_socket);
 
+std::string random_color() {
+    return "\033[38;5;" + std::to_string(16 + rand() % 220) + "m["; // ANSI Code
+}
+
 int main(){
+    std::srand(std::time(nullptr));
+
     char buffer[1024];
     int server_socket;
     
@@ -46,8 +54,10 @@ int main(){
         perror("Falha no listen");
         exit(EXIT_FAILURE);
     }
+    int ret = std::system("clear");
 
     int addrlen = sizeof(server_address);
+    std::cout << "--------------------------------------------------" << std::endl;
     while(true){
         int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
         if(client_socket < 0){
@@ -58,7 +68,6 @@ int main(){
         mutex_clt.lock();
         clients.push_back(client_socket);
         mutex_clt.unlock();
-
 
         std::thread client_thread(rotine_client, client_socket);
         client_thread.detach();  
@@ -72,12 +81,19 @@ int main(){
 
 void rotine_client(int client_socket){
     char buffer[1024];
-    while (true){
+    recv(client_socket, buffer, sizeof(buffer), 0);
+
+    char name_client[1024];
+    strcpy(name_client, buffer);
+
+    std::string color = random_color();
+    std::cout << ">----- Cliente " << color << name_client << "]\033[0m conectado ----< " << std::endl;
+    while(true){
         memset(buffer, 0, sizeof(buffer));
         int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
 
         if(bytes_read > 0){
-            std::cout << "Mensagem do cliente: " << buffer << std::endl;
+            std::cout << color << name_client << "]\033[0m: " << buffer << std::endl;
 
             mutex_clt.lock();
             for (auto client : clients) {
