@@ -11,6 +11,15 @@
 #define BUFFER_SIZE 1024
 
 char name_client[BUFFER_SIZE];
+std::string art = R"(
+-----------------------------------------------------------------------
+ ██████╗██╗  ██╗ █████╗ ████████╗               █████╗ ██████╗ ██████╗ 
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝              ██╔══██╗██╔══██╗██╔══██╗
+██║     ███████║███████║   ██║       █████╗    ███████║██████╔╝██████╔╝
+██║     ██╔══██║██╔══██║   ██║       ╚════╝    ██╔══██║██╔═══╝ ██╔═══╝ 
+╚██████╗██║  ██║██║  ██║   ██║                 ██║  ██║██║     ██║     
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                 ╚═╝  ╚═╝╚═╝     ╚═╝     
+-----------------------------------------------------------------------)";
 
 void send_messages(int client_socket){
     char buffer[BUFFER_SIZE];
@@ -69,9 +78,7 @@ int main(){
     
     send(client_socket, name_client, strlen(name_client), 0);
 
-    std::cout << "--------------------------------------------------" << std::endl;
-    std::cout << "             Conectado ao Servidor!               " << std::endl;
-    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << art << std::endl;
 
     std::thread send_thread(send_messages, client_socket);
     std::thread receive_thread(receive_messages, client_socket);

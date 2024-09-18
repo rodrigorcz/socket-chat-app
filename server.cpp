@@ -13,9 +13,23 @@
 
 #define PORT 8080
 
+typedef struct client_data{
+    std::string name, color;
+    int current_chat;
+}client_data;
+
 std::vector<int> clients;
-std::unordered_map<int, std::pair<std::string,std::string>> clients_info;
+std::unordered_map<int, client_data> clients_info;
 std::mutex mutex_clt;
+std::string art = R"(
+-----------------------------------------------------------------------
+ ██████╗██╗  ██╗ █████╗ ████████╗               █████╗ ██████╗ ██████╗ 
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝              ██╔══██╗██╔══██╗██╔══██╗
+██║     ███████║███████║   ██║       █████╗    ███████║██████╔╝██████╔╝
+██║     ██╔══██║██╔══██║   ██║       ╚════╝    ██╔══██║██╔═══╝ ██╔═══╝ 
+╚██████╗██║  ██║██║  ██║   ██║                 ██║  ██║██║     ██║     
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                 ╚═╝  ╚═╝╚═╝     ╚═╝     
+-----------------------------------------------------------------------)";
 
 void rotine_client(int client_socket);
 
@@ -24,11 +38,11 @@ std::string random_color() {
 }
 
 int main(){
+    std::system("clear");
+    std::cout << art << std::endl;
     std::srand(std::time(nullptr));
 
-    char buffer[1024];
-    int server_socket;
-    
+    int server_socket;    
     server_socket = socket(AF_INET, SOCK_STREAM, 0); // TCP IP
     if(server_socket == 0){
         perror("Falha ao criar o socket");
@@ -56,10 +70,9 @@ int main(){
         perror("Falha no listen");
         exit(EXIT_FAILURE);
     }
-    std::system("clear");
 
     int addrlen = sizeof(server_address);
-    std::cout << "--------------------------------------------------";
+
     while(true){
         int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
         if(client_socket < 0){
@@ -89,11 +102,11 @@ void rotine_client(int client_socket){
     std::string color = random_color();
 
     mutex_clt.lock();
-    clients_info[client_socket] = {name_client, color};
+    clients_info[client_socket] = {name_client, color, 0};
     mutex_clt.unlock();
 
     std::string color_name = color + name_client + "]\033[0m";
-    std::cout << "------- Cliente " << color_name << " conectado ------- " << std::endl;
+    std::cout << "-> Cliente " << color_name << " conectado." << std::endl;
 
     while(true){
         memset(buffer, 0, sizeof(buffer));
@@ -112,7 +125,7 @@ void rotine_client(int client_socket){
             mutex_clt.unlock();
 
         }else if(bytes_read == 0){
-            std::cout << "Cliente " << color_name << " desconectado." << std::endl;
+            std::cout << "-> Cliente " << color_name << " desconectado." << std::endl;
             close(client_socket);
 
             mutex_clt.lock();
@@ -122,7 +135,7 @@ void rotine_client(int client_socket){
                     break;
                 }
             }
-            
+
             clients_info.erase(client_socket);
             mutex_clt.lock();
 
