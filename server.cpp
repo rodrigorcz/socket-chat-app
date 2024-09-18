@@ -9,10 +9,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <unordered_map>
 
 #define PORT 8080
 
 std::vector<int> clients;
+std::unordered_map<int, std::pair<std::string,std::string>> clients_info;
 std::mutex mutex_clt;
 
 void rotine_client(int client_socket);
@@ -54,10 +56,10 @@ int main(){
         perror("Falha no listen");
         exit(EXIT_FAILURE);
     }
-    int ret = std::system("clear");
+    std::system("clear");
 
     int addrlen = sizeof(server_address);
-    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "--------------------------------------------------";
     while(true){
         int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
         if(client_socket < 0){
@@ -81,30 +83,36 @@ int main(){
 
 void rotine_client(int client_socket){
     char buffer[1024];
-    recv(client_socket, buffer, sizeof(buffer), 0);
+    int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
 
-    char name_client[1024];
-    strcpy(name_client, buffer);
-
+    std::string name_client(buffer, bytes_read);
     std::string color = random_color();
-    std::cout << ">----- Cliente " << color << name_client << "]\033[0m conectado ----< " << std::endl;
+
+    mutex_clt.lock();
+    clients_info[client_socket] = {name_client, color};
+    mutex_clt.unlock();
+
+    std::string color_name = color + name_client + "]\033[0m";
+    std::cout << "------- Cliente " << color_name << " conectado ------- " << std::endl;
+
     while(true){
         memset(buffer, 0, sizeof(buffer));
         int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
 
         if(bytes_read > 0){
-            std::cout << color << name_client << "]\033[0m: " << buffer << std::endl;
+            std::string output_client = color_name + ": " + buffer;
+            std::cout << output_client << std::endl;
 
             mutex_clt.lock();
             for (auto client : clients) {
                 if (client != client_socket) {
-                    send(client, buffer, bytes_read, 0);
+                    send(client, output_client.c_str(), output_client.size(), 0);
                 }
             }
             mutex_clt.unlock();
 
         }else if(bytes_read == 0){
-            std::cout << "Cliente desconectado." << std::endl;
+            std::cout << "Cliente " << color_name << " desconectado." << std::endl;
             close(client_socket);
 
             mutex_clt.lock();
@@ -114,6 +122,8 @@ void rotine_client(int client_socket){
                     break;
                 }
             }
+            
+            clients_info.erase(client_socket);
             mutex_clt.lock();
 
             break;
