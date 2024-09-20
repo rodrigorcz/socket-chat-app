@@ -11,7 +11,7 @@
 #define BUFFER_SIZE 1024
 #define IP "127.0.0.1"
 
-std:: string name_client;
+std::string name_client;
 std::string header = R"(
 -----------------------------------------------------------------------
  ██████╗██╗  ██╗ █████╗ ████████╗               █████╗ ██████╗ ██████╗ 
@@ -50,7 +50,7 @@ int main(){
     
     std::system("clear");
     std::cout << "Insira seu nome: " << std::endl;
-    std::getline(std::cin,name_client);
+    std::getline(std::cin, name_client);
     std::system("clear");
     
     send(client_socket, name_client.c_str(), name_client.size(), 0);

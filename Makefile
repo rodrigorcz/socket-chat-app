@@ -1,13 +1,9 @@
 all: compile 
 
 compile:
-		g++ -pthread -o client client.cpp
-		g++ -pthread -o server server.cpp
-
-run:
-		./server
-		./client
+	g++ -pthread -o client client.cpp
+	g++ -pthread -o server server.cpp
 
 clear:
-		rm client
-		rm server
+	rm client
+	rm server

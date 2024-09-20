@@ -15,6 +15,7 @@
 #define BUFFER_SIZE 1024
 
 std::vector<int> clients;
+std::unordered_map<int, bool> privates_chats;
 
 // hash (key: client_name, value: client_socket)
 std::unordered_map<std::string, int> clients_info;
@@ -37,8 +38,9 @@ void rotine_client(int client_socket);
 std::string random_color();
 void send_whisper(std::string buffer, int client_socket);
 void send_anonymous(std::string buffer, int client_socket);
-void private_chat();
+bool private_chat(std::string buffer, int client_socket);
 bool is_command(std::string buffer, int client_socket);
+void remove_client(int client_socket, const std::string &name_client);
 
 int main(){
     std::system("clear");
@@ -110,8 +112,45 @@ void send_whisper(std::string buffer, int client_socket){
     }
 }
 
-void private_chat(){
+bool private_chat(std::string buffer, int client_socket) {
+    privates_chats[client_socket] = true;
+    int name_end = buffer.find(' ', 3);
+    std::string name_receptor = buffer.substr(3, name_end - 3);
+    
+    mutex_clt.lock();
+    if(clients_info.find(name_receptor) == clients_info.end()){
+        std::string error_msg = "Usuário " + name_receptor + " não encontrado.\n";
+        send(client_socket, error_msg.c_str(), error_msg.size(), 0);
+        return false;
+    }
+    mutex_clt.unlock();
 
+    int receptor_socket = clients_info[name_receptor];
+    std::string name_client = clients_networking[client_socket];
+    
+    std::string welcome_msg = "Iniciando chat privado com " + name_receptor + ". Digite \\exit para sair.\n";
+    send(client_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
+
+    char buffer_private[BUFFER_SIZE];
+    while(true){
+        memset(buffer_private, 0, sizeof(buffer_private));
+        int bytes_read = recv(client_socket, buffer_private, sizeof(buffer_private), 0);
+        
+        if(bytes_read <= 0){
+            remove_client(client_socket, name_client);
+            return false;
+        }
+
+        std::string buffer_str(buffer_private, bytes_read);
+        
+        if(buffer_str == "\\exit\n"){
+            send(client_socket, "Você saiu do chat privado.\n", 29, 0);
+            return true;
+        }
+
+        std::string output_msg = "\033[38;5;203m[Privado - " + name_client + "]\033[0m: " + buffer_str;
+        send(receptor_socket, output_msg.c_str(), output_msg.size(), 0);
+    }
 }
 
 
@@ -134,8 +173,7 @@ bool is_command(std::string buffer, int client_socket){
     }
 
     if(buffer.substr(0, 2) == "\\p"){
-        private_chat();
-        return true;
+        return private_chat(buffer, client_socket);
     }
 
     if(buffer.substr(0, 2) == "\\a"){
@@ -147,7 +185,6 @@ bool is_command(std::string buffer, int client_socket){
 }
 
 void rotine_client(int client_socket){
-    int is_private = 0;
     char buffer[BUFFER_SIZE];
     int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
 
@@ -157,6 +194,7 @@ void rotine_client(int client_socket){
     mutex_clt.lock();
     clients_info[name_client] = client_socket;
     clients_networking[client_socket] = name_client;
+    privates_chats[client_socket] = false;
     mutex_clt.unlock();
 
     std::string color_name = color + name_client + "]\033[0m";
@@ -168,36 +206,39 @@ void rotine_client(int client_socket){
 
         if(bytes_read > 0){
             std::string buffer_str(buffer, bytes_read);
-            if(!is_command(buffer, client_socket)){ // send global message
-                std::string output_client = color_name + ": " + buffer;
+            if(!is_command(buffer_str, client_socket)){ // send global message
+                std::string output_client = color_name + ": " + buffer_str;
                 std::cout << output_client << std::endl;
 
                 mutex_clt.lock();
                 for(auto client : clients){
-                    if(client != client_socket)
+                    if(client != client_socket && !privates_chats[client])
                         send(client, output_client.c_str(), output_client.size(), 0);
                 }
                 mutex_clt.unlock();
             }
         }else if(bytes_read == 0){
             std::cout << "-> Cliente " << color_name << " desconectado." << std::endl;
-            close(client_socket);
-
-            mutex_clt.lock();
-            for(size_t i = 0; i < clients.size(); ++i){
-                if(clients[i] == client_socket){
-                    clients[i] = -1;  
-                    break;
-                }
-            }
-
-            clients_info.erase(name_client);
-            clients_networking.erase(client_socket);
-            mutex_clt.lock();
-
+            remove_client(client_socket, name_client);
             break;
         }
     }
+}
+
+void remove_client(int client_socket, const std::string &name_client) {
+    close(client_socket);
+
+    mutex_clt.lock();
+    for(size_t i = 0; i < clients.size(); ++i){
+        if(clients[i] == client_socket){
+            clients[i] = -1;  
+            break;
+        }
+    }
+
+    clients_info.erase(name_client);
+    clients_networking.erase(client_socket);
+    mutex_clt.lock();
 }
 
 std::string random_color() {
