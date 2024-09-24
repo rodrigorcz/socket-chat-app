@@ -52,7 +52,6 @@ void send_messages(int client_socket){
             exit(EXIT_SUCCESS);
         };
 
-        std::string msg =  "\033[A\33[2K" + name_client;
         send(client_socket, buffer, strlen(buffer), 0);
     }
 }

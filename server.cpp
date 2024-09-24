@@ -83,46 +83,93 @@ void send_whisper(std::string buffer, int client_socket){
 }
 
 bool private_chat(std::string buffer, int client_socket) {
-    privates_chats[client_socket] = true;
     int name_end = buffer.find(' ', 3);
     std::string name_receptor = buffer.substr(3, name_end - 3);
-    
+
     mutex_clt.lock();
     if(clients_info.find(name_receptor) == clients_info.end()){
         std::string error_msg = "Usuário " + name_receptor + " não encontrado.\n";
         send(client_socket, error_msg.c_str(), error_msg.size(), 0);
+        mutex_clt.unlock();
         return false;
     }
+    int receptor_socket = clients_info[name_receptor];
+    privates_chats[client_socket] = true;
+    privates_chats[receptor_socket] = true;
     mutex_clt.unlock();
 
-    int receptor_socket = clients_info[name_receptor];
     std::string name_client = clients_networking[client_socket];
+    std::string name_receptor_client = clients_networking[receptor_socket];
     
     std::string li = "-----------------------------------------------------------------------\n";
-    std::string welcome_msg = li+"Iniciando chat privado com " + name_receptor + ". Digite \\exit para sair.\n"+li;
+    std::string welcome_msg = li + "Iniciando chat privado com " + name_receptor + ". Digite \\exit para sair.\n" + li;
+    
     send(client_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
+    send(receptor_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
 
     char buffer_private[BUFFER_SIZE];
-    while(true){
-        memset(buffer_private, 0, sizeof(buffer_private));
-        int bytes_read = recv(client_socket, buffer_private, sizeof(buffer_private), 0);
-        
-        if(bytes_read <= 0){
-            remove_client(client_socket, name_client);
-            return false;
-        }
+    std::thread private_thread([client_socket, receptor_socket, name_client, name_receptor_client] {
+        char buffer_private[BUFFER_SIZE];
+        while (true) {
+            memset(buffer_private, 0, sizeof(buffer_private));
+            int bytes_read = recv(client_socket, buffer_private, sizeof(buffer_private), 0);
 
-        std::string buffer_str(buffer_private, bytes_read);
-        
-        if(buffer_str == "\\exit\n"){
-            send(client_socket, "Você saiu do chat privado.\n", 29, 0);
-            return true;
-        }
+            if (bytes_read <= 0) {
+                send(client_socket, "Erro ao ler a mensagem. Desconectando...\n", 40, 0);
+                break;
+            }
 
-        std::string output_msg = "\033[38;5;203m[Privado - " + name_client + "]\033[0m: " + buffer_str;
-        send(receptor_socket, output_msg.c_str(), output_msg.size(), 0);
-    }
+            std::string buffer_str(buffer_private, bytes_read);
+
+            if (buffer_str == "\\exit\n") {
+                std::string exit_msg = name_client + " saiu do chat privado.\n";
+                send(client_socket, "Você saiu do chat privado.\n", 29, 0);
+                send(receptor_socket, exit_msg.c_str(), exit_msg.size(), 0);
+                break;
+            }
+
+            std::string output_msg = "[Privado - " + name_client + "]: " + buffer_str;
+            send(receptor_socket, output_msg.c_str(), output_msg.size(), 0);
+        }
+        
+        privates_chats[client_socket] = false;
+        privates_chats[receptor_socket] = false;
+    });
+
+    std::thread receptor_thread([client_socket, receptor_socket, name_client, name_receptor_client] {
+        char buffer_private[BUFFER_SIZE];
+        while (true) {
+            memset(buffer_private, 0, sizeof(buffer_private));
+            int bytes_read = recv(receptor_socket, buffer_private, sizeof(buffer_private), 0);
+
+            if (bytes_read <= 0) {
+                send(receptor_socket, "Erro ao ler a mensagem. Desconectando...\n", 40, 0);
+                break;
+            }
+
+            std::string buffer_str(buffer_private, bytes_read);
+
+            if (buffer_str == "\\exit\n") {
+                std::string exit_msg = name_receptor_client + " saiu do chat privado.\n";
+                send(receptor_socket, "Você saiu do chat privado.\n", 29, 0);
+                send(client_socket,  exit_msg.c_str(), exit_msg.size(), 0);
+                break;
+            }
+
+            std::string output_msg = "[Privado - " + name_receptor_client + "]: " + buffer_str;
+            send(client_socket, output_msg.c_str(), output_msg.size(), 0);
+        }
+        
+        privates_chats[client_socket] = false;
+        privates_chats[receptor_socket] = false;
+    });
+
+    private_thread.detach();
+    receptor_thread.detach();
+
+    return true; 
 }
+
 
 void send_anonymous(std::string buffer, int client_socket){
     std::string message;
