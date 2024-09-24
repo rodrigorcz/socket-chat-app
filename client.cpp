@@ -1,29 +1,4 @@
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <cstring>
-#include <string.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-
-#define PORT 8080
-#define BUFFER_SIZE 1024
-#define IP "127.0.0.1"
-
-std::string name_client;
-std::string header = R"(
------------------------------------------------------------------------
- ██████╗██╗  ██╗ █████╗ ████████╗               █████╗ ██████╗ ██████╗ 
-██╔════╝██║  ██║██╔══██╗╚══██╔══╝              ██╔══██╗██╔══██╗██╔══██╗
-██║     ███████║███████║   ██║       █████╗    ███████║██████╔╝██████╔╝
-██║     ██╔══██║██╔══██║   ██║       ╚════╝    ██╔══██║██╔═══╝ ██╔═══╝ 
-╚██████╗██║  ██║██║  ██║   ██║                 ██║  ██║██║     ██║     
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                 ╚═╝  ╚═╝╚═╝     ╚═╝     
------------------------------------------------------------------------)";
-
-void send_messages(int client_socket);
-void receive_messages(int client_socket);
+#include "client.hpp"
 
 int main(){
     int client_socket = 0;
@@ -74,7 +49,7 @@ void send_messages(int client_socket){
         std::cin.getline(buffer, BUFFER_SIZE);
         if(!strcmp(buffer, "exit")){            
             close(client_socket);
-            exit(0);
+            exit(EXIT_SUCCESS);
         };
 
         std::string msg =  "\033[A\33[2K" + name_client;
@@ -92,7 +67,7 @@ void receive_messages(int client_socket){
         }else if(bytes_received == 0){
             std::cout << "Cliente desconectado." << std::endl;
             close(client_socket);
-            exit(0);
+            exit(EXIT_SUCCESS);
         }
     }
 }

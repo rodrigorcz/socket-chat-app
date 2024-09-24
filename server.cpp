@@ -1,46 +1,4 @@
-#include <iostream>
-#include <thread>
-#include <mutex>
-#include <vector>
-#include <ctime> 
-#include <cstring>
-#include <cstdlib>
-#include <sys/socket.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <unordered_map>
-
-#define PORT 8080
-#define BUFFER_SIZE 1024
-
-std::vector<int> clients;
-std::unordered_map<int, bool> privates_chats;
-
-// hash (key: client_name, value: client_socket)
-std::unordered_map<std::string, int> clients_info;
-
-// hash (key: client_socket, value: client_name) 
-std::unordered_map<int, std::string> clients_networking; 
-
-std::mutex mutex_clt;
-std::string header = R"(
------------------------------------------------------------------------
- ██████╗██╗  ██╗ █████╗ ████████╗               █████╗ ██████╗ ██████╗ 
-██╔════╝██║  ██║██╔══██╗╚══██╔══╝              ██╔══██╗██╔══██╗██╔══██╗
-██║     ███████║███████║   ██║       █████╗    ███████║██████╔╝██████╔╝
-██║     ██╔══██║██╔══██║   ██║       ╚════╝    ██╔══██║██╔═══╝ ██╔═══╝ 
-╚██████╗██║  ██║██║  ██║   ██║                 ██║  ██║██║     ██║     
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                 ╚═╝  ╚═╝╚═╝     ╚═╝     
------------------------------------------------------------------------)";
-
-void rotine_client(int client_socket);
-std::string random_color();
-void send_whisper(std::string buffer, int client_socket);
-void send_anonymous(std::string buffer, int client_socket);
-bool private_chat(std::string buffer, int client_socket);
-bool is_command(std::string buffer, int client_socket);
-void remove_client(int client_socket, const std::string &name_client);
+#include "server.hpp"
 
 int main(){
     std::system("clear");
@@ -48,36 +6,40 @@ int main(){
     std::srand(std::time(nullptr));
 
     int server_socket;    
-    server_socket = socket(AF_INET, SOCK_STREAM, 0); // TCP IP
+    server_socket = socket(AF_INET, SOCK_STREAM, 0); 
     if(server_socket == 0){
         perror("Falha ao criar o socket");
         exit(EXIT_FAILURE);
     }
 
-    // Configurar SO_RCVBUF pode ser util
     int opt = 1;
-    if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) < 0){
-        perror("Falha ao configurar o socket (setsockopt)");
+
+    if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){
+        perror("Falha ao configurar o socket (SO_REUSEADDR)");
         exit(EXIT_FAILURE);
     }
-    
+
+    if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0){
+        perror("Falha ao configurar o socket (SO_REUSEPORT)");
+        exit(EXIT_FAILURE);
+    }
+
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(PORT);
     server_address.sin_addr.s_addr = INADDR_ANY;
 
-    if(bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+    if(bind(server_socket, (struct sockaddr *)&server_address, sizeof(server_address)) < 0){
         perror("Falha no bind");
         exit(EXIT_FAILURE);
     }
-
-    if(listen(server_socket, 6) < 0) {
+    
+    if(listen(server_socket, MAX_CLIENTS) < 0){
         perror("Falha no listen");
         exit(EXIT_FAILURE);
     }
 
     int addrlen = sizeof(server_address);
-
     while(true){
         int client_socket = accept(server_socket, (struct sockaddr *)&server_address, (socklen_t*)&addrlen);
         if(client_socket < 0){
@@ -86,7 +48,8 @@ int main(){
         }
 
         mutex_clt.lock();
-        clients.push_back(client_socket);
+        clients_list.push_back(client_socket);
+        current_clients++;
         mutex_clt.unlock();
 
         std::thread client_thread(rotine_client, client_socket);
@@ -96,6 +59,13 @@ int main(){
     close(server_socket);
 
     return 0;
+}
+
+std::string assign_color(int client_id) {
+    if (!style) {
+        return ""; 
+    }
+    return colors[client_id]; 
 }
 
 void send_whisper(std::string buffer, int client_socket){
@@ -128,7 +98,8 @@ bool private_chat(std::string buffer, int client_socket) {
     int receptor_socket = clients_info[name_receptor];
     std::string name_client = clients_networking[client_socket];
     
-    std::string welcome_msg = "Iniciando chat privado com " + name_receptor + ". Digite \\exit para sair.\n";
+    std::string li = "-----------------------------------------------------------------------\n";
+    std::string welcome_msg = li+"Iniciando chat privado com " + name_receptor + ". Digite \\exit para sair.\n"+li;
     send(client_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
 
     char buffer_private[BUFFER_SIZE];
@@ -153,19 +124,27 @@ bool private_chat(std::string buffer, int client_socket) {
     }
 }
 
-
 void send_anonymous(std::string buffer, int client_socket){
-    std::string message = "\033[38;5;248m[Anonymous]: " + buffer.substr(3) + "\033[0m";
+    std::string message;
+
+    if(style)
+        message = "\033[38;5;248m[Anonymous]: " + buffer.substr(3) + "\033[0m";
+    else
+        message = "[Anonymous]: " + buffer.substr(3);
+
+    std::cout << message << std::endl;
 
     mutex_clt.lock();
-    for(auto client : clients){
-        if(client != client_socket)
-            send(client, message.c_str(), message.size(), 0);
+    for(auto client : clients_list){
+        if (style && client == client_socket)
+            message = "\033[A\33[2K" + message;
+            
+        send(client, message.c_str(), message.size(), 0);
     }
     mutex_clt.unlock();
 }
 
-bool is_command(std::string buffer, int client_socket){
+bool process_command(std::string buffer, int client_socket){
 
     if(buffer.substr(0, 2) == "\\w"){
         send_whisper(buffer, client_socket);
@@ -185,11 +164,10 @@ bool is_command(std::string buffer, int client_socket){
 }
 
 void rotine_client(int client_socket){
+    std::string color = assign_color(current_clients-1);
     char buffer[BUFFER_SIZE];
     int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
-
     std::string name_client(buffer, bytes_read);
-    std::string color = random_color();
 
     mutex_clt.lock();
     clients_info[name_client] = client_socket;
@@ -197,8 +175,12 @@ void rotine_client(int client_socket){
     privates_chats[client_socket] = false;
     mutex_clt.unlock();
 
-    std::string color_name = color + name_client + "]\033[0m";
-    std::cout << "-> Cliente " << color_name << " conectado." << std::endl;
+    if(style)
+        name_client = color + name_client + "]\033[0m";
+    else
+        name_client = "[" + name_client + "]";
+
+    std::cout << "-> Cliente " << name_client << " conectado." << std::endl;
 
     while(true){
         memset(buffer, 0, sizeof(buffer));
@@ -206,43 +188,43 @@ void rotine_client(int client_socket){
 
         if(bytes_read > 0){
             std::string buffer_str(buffer, bytes_read);
-            if(!is_command(buffer_str, client_socket)){ // send global message
-                std::string output_client = color_name + ": " + buffer_str;
+            if(!process_command(buffer_str, client_socket)){ 
+                std::string output_client = name_client + ": " + buffer_str;
                 std::cout << output_client << std::endl;
 
                 mutex_clt.lock();
-                for(auto client : clients){
+                for(auto client : clients_list){
                     if(client != client_socket && !privates_chats[client])
                         send(client, output_client.c_str(), output_client.size(), 0);
+                    else if (style && client == client_socket){
+                        buffer_str = "\033[A\33[2K" + name_client + " (YOU): " + buffer_str;;
+                        send(client, buffer_str.c_str(), buffer_str.size(), 0);
+                    }
                 }
                 mutex_clt.unlock();
             }
         }else if(bytes_read == 0){
-            std::cout << "-> Cliente " << color_name << " desconectado." << std::endl;
+            std::cout << "-> Cliente " << name_client << " desconectado." << std::endl;
             remove_client(client_socket, name_client);
             break;
         }
     }
 }
 
-void remove_client(int client_socket, const std::string &name_client) {
+void remove_client(int client_socket, std::string name_client) {
     close(client_socket);
 
     mutex_clt.lock();
-    for(size_t i = 0; i < clients.size(); ++i){
-        if(clients[i] == client_socket){
-            clients[i] = -1;  
+    for(size_t i = 0; i < clients_list.size(); ++i){
+        if(clients_list[i] == client_socket){
+            clients_list[i] = -1;  
             break;
         }
     }
 
     clients_info.erase(name_client);
     clients_networking.erase(client_socket);
+    current_clients--;
     mutex_clt.lock();
 }
-
-std::string random_color() {
-    return "\033[38;5;" + std::to_string(16 + rand() % 220) + "m["; // ANSI Code
-}
-
 
