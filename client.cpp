@@ -25,7 +25,7 @@ int main(){
     
     std::system("clear");
     std::cout << "Insira seu nome: " << std::endl;
-    std::getline(std::cin, name_client);
+    std::cin >> name_client;
     std::system("clear");
     
     send(client_socket, name_client.c_str(), name_client.size(), 0);

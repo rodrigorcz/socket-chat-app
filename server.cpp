@@ -13,7 +13,6 @@ int main(){
     }
 
     int opt = 1;
-
     if(setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){
         perror("Falha ao configurar o socket (SO_REUSEADDR)");
         exit(EXIT_FAILURE);
@@ -61,17 +60,86 @@ int main(){
     return 0;
 }
 
-std::string assign_color(int client_id) {
-    if (!style) {
-        return ""; 
+
+void rotine_client(int client_socket){
+    std::string color;
+    if(style) color = colors[current_clients-1]; 
+    
+    char buffer[BUFFER_SIZE];
+    int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
+    std::string name_client(buffer, bytes_read);
+
+    mutex_clt.lock();
+    clients_info[name_client] = client_socket;
+    clients_networking[client_socket] = name_client;
+    privates_chats[client_socket] = false;
+    mutex_clt.unlock();
+
+    (!style)? name_client = "[" + name_client + "]" : 
+              name_client = color + name_client + "]\033[0m";
+   
+    std::cout << "-> Cliente " << name_client << " conectado." << std::endl;
+
+    while(true){
+        memset(buffer, 0, sizeof(buffer));
+        int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
+
+        if(bytes_read > 0){
+            std::string buffer_str(buffer, bytes_read);
+            if(!process_command(buffer_str, client_socket)){ 
+
+                if(privates_chats[client_socket]) continue;
+                
+                std::string output_client = name_client + ": " + buffer_str;
+                std::cout << output_client << std::endl;
+
+                mutex_clt.lock();
+                for(auto client : clients_list){
+                    if(client != client_socket && !privates_chats[client])
+                        send(client, output_client.c_str(), output_client.size(), 0);
+                    else if (style && client == client_socket){
+                        buffer_str = "\033[A\33[2K" + name_client + " (YOU): " + buffer_str;;
+                        send(client, buffer_str.c_str(), buffer_str.size(), 0);
+                    }
+                }
+                mutex_clt.unlock();
+            }
+        }else if(bytes_read == 0){
+            std::cout << "-> Cliente " << name_client << " desconectado." << std::endl;
+            remove_client(client_socket, name_client);
+            break;
+        }
     }
-    return colors[client_id]; 
+}
+
+bool process_command(std::string buffer, int client_socket){
+
+    if(buffer.substr(0, 2) == "\\w"){
+        send_whisper(buffer, client_socket);
+        return true;
+    }
+
+    if(buffer.substr(0, 2) == "\\p"){
+        return private_chat(buffer, client_socket);
+    }
+
+    if(buffer.substr(0, 2) == "\\a"){
+        send_anonymous(buffer, client_socket);
+        return true;
+    }
+
+    return false;
 }
 
 void send_whisper(std::string buffer, int client_socket){
     int name_end = buffer.find(' ', 3);
     std::string name_receptor = buffer.substr(3, name_end - 3);
-    std::string message = "\033[38;5;170m[" + clients_networking[client_socket] + "] ~ Sussuro \033[0m:"+ buffer.substr(name_end + 1);
+    std::string message;
+
+    if(!style) 
+        message = "[" + clients_networking[client_socket] + "] ~ Sussuro: "+ buffer.substr(name_end + 1);
+    else 
+        message = "\033[38;5;170m[" + clients_networking[client_socket] + "] ~ Sussuro: \033[0m"+ buffer.substr(name_end + 1);
 
     int client_receptor = clients_info[name_receptor];
 
@@ -80,6 +148,26 @@ void send_whisper(std::string buffer, int client_socket){
         send(client_receptor, message.c_str(), message.size(), 0);
         mutex_clt.unlock();
     }
+}
+
+void send_anonymous(std::string buffer, int client_socket){
+    std::string message;
+
+    if(style)
+        message = "\033[38;5;248m[Anonymous]: " + buffer.substr(3) + "\033[0m";
+    else
+        message = "[Anonymous]: " + buffer.substr(3);
+
+    std::cout << message << std::endl;
+
+    mutex_clt.lock();
+    for(auto client : clients_list){
+        if (style && client == client_socket)
+            message = "\033[A\33[2K" + message;
+            
+        send(client, message.c_str(), message.size(), 0);
+    }
+    mutex_clt.unlock();
 }
 
 bool private_chat(std::string buffer, int client_socket) {
@@ -107,155 +195,40 @@ bool private_chat(std::string buffer, int client_socket) {
     send(client_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
     send(receptor_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
 
-    char buffer_private[BUFFER_SIZE];
-    std::thread private_thread([client_socket, receptor_socket, name_client, name_receptor_client] {
-        char buffer_private[BUFFER_SIZE];
-        while (true) {
-            memset(buffer_private, 0, sizeof(buffer_private));
-            int bytes_read = recv(client_socket, buffer_private, sizeof(buffer_private), 0);
+    std::thread private_thread(rotine_private_chat, client_socket, receptor_socket, name_client, name_receptor_client);
+    std::thread receptor_thread(rotine_private_chat, receptor_socket, client_socket, name_receptor_client, name_client);
 
-            if (bytes_read <= 0) {
-                send(client_socket, "Erro ao ler a mensagem. Desconectando...\n", 40, 0);
-                break;
-            }
-
-            std::string buffer_str(buffer_private, bytes_read);
-
-            if (buffer_str == "\\exit\n") {
-                std::string exit_msg = name_client + " saiu do chat privado.\n";
-                send(client_socket, "Você saiu do chat privado.\n", 29, 0);
-                send(receptor_socket, exit_msg.c_str(), exit_msg.size(), 0);
-                break;
-            }
-
-            std::string output_msg = "[Privado - " + name_client + "]: " + buffer_str;
-            send(receptor_socket, output_msg.c_str(), output_msg.size(), 0);
-        }
-        
-        privates_chats[client_socket] = false;
-        privates_chats[receptor_socket] = false;
-    });
-
-    std::thread receptor_thread([client_socket, receptor_socket, name_client, name_receptor_client] {
-        char buffer_private[BUFFER_SIZE];
-        while (true) {
-            memset(buffer_private, 0, sizeof(buffer_private));
-            int bytes_read = recv(receptor_socket, buffer_private, sizeof(buffer_private), 0);
-
-            if (bytes_read <= 0) {
-                send(receptor_socket, "Erro ao ler a mensagem. Desconectando...\n", 40, 0);
-                break;
-            }
-
-            std::string buffer_str(buffer_private, bytes_read);
-
-            if (buffer_str == "\\exit\n") {
-                std::string exit_msg = name_receptor_client + " saiu do chat privado.\n";
-                send(receptor_socket, "Você saiu do chat privado.\n", 29, 0);
-                send(client_socket,  exit_msg.c_str(), exit_msg.size(), 0);
-                break;
-            }
-
-            std::string output_msg = "[Privado - " + name_receptor_client + "]: " + buffer_str;
-            send(client_socket, output_msg.c_str(), output_msg.size(), 0);
-        }
-        
-        privates_chats[client_socket] = false;
-        privates_chats[receptor_socket] = false;
-    });
-
-    private_thread.detach();
-    receptor_thread.detach();
+    private_thread.join();
+    receptor_thread.join();
 
     return true; 
 }
 
+void rotine_private_chat(int client_socket, int receptor_socket, std::string name_client, std::string name_receptor_client) {
+    char buffer_private[BUFFER_SIZE];
+    bool active = true;
 
-void send_anonymous(std::string buffer, int client_socket){
-    std::string message;
+    while(active){
+        memset(buffer_private, 0, sizeof(buffer_private));
+        int bytes_read = recv(client_socket, buffer_private, sizeof(buffer_private), 0);
 
-    if(style)
-        message = "\033[38;5;248m[Anonymous]: " + buffer.substr(3) + "\033[0m";
-    else
-        message = "[Anonymous]: " + buffer.substr(3);
-
-    std::cout << message << std::endl;
-
-    mutex_clt.lock();
-    for(auto client : clients_list){
-        if (style && client == client_socket)
-            message = "\033[A\33[2K" + message;
-            
-        send(client, message.c_str(), message.size(), 0);
-    }
-    mutex_clt.unlock();
-}
-
-bool process_command(std::string buffer, int client_socket){
-
-    if(buffer.substr(0, 2) == "\\w"){
-        send_whisper(buffer, client_socket);
-        return true;
-    }
-
-    if(buffer.substr(0, 2) == "\\p"){
-        return private_chat(buffer, client_socket);
-    }
-
-    if(buffer.substr(0, 2) == "\\a"){
-        send_anonymous(buffer, client_socket);
-        return true;
-    }
-
-    return false;
-}
-
-void rotine_client(int client_socket){
-    std::string color = assign_color(current_clients-1);
-    char buffer[BUFFER_SIZE];
-    int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
-    std::string name_client(buffer, bytes_read);
-
-    mutex_clt.lock();
-    clients_info[name_client] = client_socket;
-    clients_networking[client_socket] = name_client;
-    privates_chats[client_socket] = false;
-    mutex_clt.unlock();
-
-    if(style)
-        name_client = color + name_client + "]\033[0m";
-    else
-        name_client = "[" + name_client + "]";
-
-    std::cout << "-> Cliente " << name_client << " conectado." << std::endl;
-
-    while(true){
-        memset(buffer, 0, sizeof(buffer));
-        int bytes_read = recv(client_socket, buffer, sizeof(buffer), 0);
-
-        if(bytes_read > 0){
-            std::string buffer_str(buffer, bytes_read);
-            if(!process_command(buffer_str, client_socket)){ 
-                std::string output_client = name_client + ": " + buffer_str;
-                std::cout << output_client << std::endl;
-
-                mutex_clt.lock();
-                for(auto client : clients_list){
-                    if(client != client_socket && !privates_chats[client])
-                        send(client, output_client.c_str(), output_client.size(), 0);
-                    else if (style && client == client_socket){
-                        buffer_str = "\033[A\33[2K" + name_client + " (YOU): " + buffer_str;;
-                        send(client, buffer_str.c_str(), buffer_str.size(), 0);
-                    }
-                }
-                mutex_clt.unlock();
-            }
-        }else if(bytes_read == 0){
-            std::cout << "-> Cliente " << name_client << " desconectado." << std::endl;
-            remove_client(client_socket, name_client);
+        if (bytes_read <= 0) {
+            active = false;
             break;
         }
+
+        std::string buffer_str(buffer_private, bytes_read);
+        if (buffer_str == "\\exit\n") {
+            send(client_socket, "Você saiu do chat privado.\n", 29, 0);
+            break;
+        }
+
+        std::string output_msg = "[Privado - " + name_client + "]: " + buffer_str;
+        send(receptor_socket, output_msg.c_str(), output_msg.size(), 0);
     }
+
+    privates_chats[client_socket] = false;
+    privates_chats[receptor_socket] = false;
 }
 
 void remove_client(int client_socket, std::string name_client) {
@@ -274,4 +247,3 @@ void remove_client(int client_socket, std::string name_client) {
     current_clients--;
     mutex_clt.lock();
 }
-
