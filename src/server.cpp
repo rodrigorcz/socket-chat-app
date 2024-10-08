@@ -2,7 +2,7 @@
 
 int main(){
     // exibe o cabecalho inicial limpando a tela
-    std::system("clear");
+    g = system("clear");
     std::cout << header << std::endl;
     std::srand(std::time(nullptr));
 
@@ -234,8 +234,8 @@ bool private_chat(std::string buffer, int client_socket) {
     send(receptor_socket, welcome_msg.c_str(), welcome_msg.size(), 0);
 
     // inicia duas threads para gerenciar a conversa privada
-    std::thread private_thread(rotine_private_chat, client_socket, receptor_socket, name_client, name_receptor_client);
-    std::thread receptor_thread(rotine_private_chat, receptor_socket, client_socket, name_receptor_client, name_client);
+    std::thread private_thread(rotine_private_chat, client_socket, receptor_socket, name_client);
+    std::thread receptor_thread(rotine_private_chat, receptor_socket, client_socket, name_receptor_client);
 
     // aguarda execucao das threads
     private_thread.join();
@@ -245,7 +245,7 @@ bool private_chat(std::string buffer, int client_socket) {
 }
 
 // funcao para gerenciar a rotina do chat privado entre dois clientes
-void rotine_private_chat(int client_socket, int receptor_socket, std::string name_client, std::string name_receptor_client) {
+void rotine_private_chat(int client_socket, int receptor_socket, std::string name_client) {
     char buffer_private[BUFFER_SIZE];
     bool active = true;
 
@@ -256,6 +256,7 @@ void rotine_private_chat(int client_socket, int receptor_socket, std::string nam
 
         if(bytes_read <= 0){ // se nao houver bytes lidos encerra o chat
             active = false;
+            remove_client(client_socket, name_client); 
             break;
         }
 

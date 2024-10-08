@@ -1,8 +1,8 @@
 all: compile 
 
-compile:
-	g++ -lpthread -pthread -o client client.cpp
-	g++ -lpthread -pthread -o server server.cpp
+compile: 
+	g++  -pthread -o client src/client.cpp
+	g++  -pthread -o server src/server.cpp
 
 clear:
 	rm client

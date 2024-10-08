@@ -28,10 +28,10 @@ int main(){
     }
     
     // limpa a tela do terminal e solicita o envio de um nome
-    std::system("clear");
+    g = std::system("clear");
     std::cout << "Insira seu nome: " << std::endl;
     std::cin >> name_client;
-    std::system("clear");
+    g = std::system("clear");
     
     // envia o nome do cliente para o servidor
     send(client_socket, name_client.c_str(), name_client.size(), 0);
@@ -58,7 +58,7 @@ void send_messages(int client_socket){
     // loop para envio de mensagem
     while(true){
         std::cin.getline(buffer, BUFFER_SIZE);
-        if(!strcmp(buffer, "\\quit")){ // fecha o chat caso o cliente digite \quit
+        if(!strcmp(buffer, "\\exit")){ // fecha o chat caso o cliente digite \exit
             std::cout << "Fechando o Chat...." << std::endl;  
             close(client_socket);
             exit(EXIT_SUCCESS);

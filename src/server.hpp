@@ -53,11 +53,13 @@ std::vector<std::string> colors = {
     "\033[38;5;244m["   // Cinza
 };
 
+int g; // lixo
+
 // funcoes utilizadas
 void rotine_client(int client_socket);
 bool process_command(std::string buffer, int client_socket);
 void send_whisper(std::string buffer, int client_socket);
 void send_anonymous(std::string buffer, int client_socket);
 bool private_chat(std::string buffer, int client_socket);
-void rotine_private_chat(int client_socket, int receptor_socket, std::string name_client, std::string name_receptor_client);
+void rotine_private_chat(int client_socket, int receptor_socket, std::string name_client);
 void remove_client(int client_socket, std::string name_client);

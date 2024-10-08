@@ -27,9 +27,11 @@ Comandos
 \a mensagem : Envia uma mensagem global anonima
 \p usuario : Entra em um chat privado com usuario
 \w usuario mensagem : Envia um sussuro para um usuario
+\exit : Sair do chat
 -----------------------------------------------------------------------
-
 )";
+
+int g; // lixo
 
 // funcoes utilizadas
 void send_messages(int client_socket);
