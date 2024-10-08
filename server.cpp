@@ -89,10 +89,11 @@ void rotine_client(int client_socket){
     mutex_clt.unlock();
 
     // formata o nome do cliente para exibicao
-    (!style)? name_client = "[" + name_client + "]" : 
-              name_client = color + name_client + "]\033[0m";
+    std::string name_client_out;
+    (!style)? name_client_out = "[" + name_client + "]" : 
+              name_client_out = color + name_client + "]\033[0m";
    
-    std::cout << "-> Cliente " << name_client << " conectado." << std::endl;
+    std::cout << "-> Cliente " << name_client_out << " conectado." << std::endl;
 
     // loop para receber mensagens
     while(running){
@@ -106,7 +107,7 @@ void rotine_client(int client_socket){
                 if(privates_chats[client_socket]) continue;
                 
                 // formatacao da mensagem que sera enviada
-                std::string output_client = name_client + ": " + buffer_str;
+                std::string output_client = name_client_out + ": " + buffer_str;
                 std::cout << output_client << std::endl;
 
                 // envia a mensagem ao restante dos clientes conectados
@@ -115,14 +116,14 @@ void rotine_client(int client_socket){
                     if(client != client_socket && !privates_chats[client])
                         send(client, output_client.c_str(), output_client.size(), 0);
                     else if (style && client == client_socket){
-                        buffer_str = "\033[A\33[2K" + name_client + " (YOU): " + buffer_str;;
+                        buffer_str = "\033[A\33[2K" + name_client_out + " (YOU): " + buffer_str;;
                         send(client, buffer_str.c_str(), buffer_str.size(), 0);
                     }
                 }
                 mutex_clt.unlock();
             }
         }else if(bytes_read == 0){ // verifica se o cliente desconectou
-            std::cout << "-> Cliente " << name_client << " desconectado." << std::endl;
+            std::cout << "-> Cliente " << name_client_out << " desconectado." << std::endl;
             remove_client(client_socket, name_client); 
             break;
         }
@@ -282,21 +283,13 @@ void rotine_private_chat(int client_socket, int receptor_socket, std::string nam
 // funcao para remover um cliente desconectado
 void remove_client(int client_socket, std::string name_client) {
 
+    // sinaliza a thread da rotina do cliente no servidor para parar
+    running = false;
+
     // apaga as informacoes em todas as estruturas que armazenavam suas informacoes
     close(client_socket);
-
-    // sinaliza a thread do cliente para parar
-    running = false;
-    mutex_clt.lock();
-    for(size_t i = 0; i < clients_list.size(); ++i){
-        if(clients_list[i] == client_socket){
-            clients_list[i] = -1;  
-            break;
-        }
-    }
 
     clients_info.erase(name_client);
     clients_networking.erase(client_socket);
     current_clients--;
-    mutex_clt.lock();
 }

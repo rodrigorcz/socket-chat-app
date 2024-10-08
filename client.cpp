@@ -58,7 +58,7 @@ void send_messages(int client_socket){
     // loop para envio de mensagem
     while(true){
         std::cin.getline(buffer, BUFFER_SIZE);
-        if(!strcmp(buffer, "\\quit")){ // fecha o chat caso o cliente digite \exit
+        if(!strcmp(buffer, "\\quit")){ // fecha o chat caso o cliente digite \quit
             std::cout << "Fechando o Chat...." << std::endl;  
             close(client_socket);
             exit(EXIT_SUCCESS);
