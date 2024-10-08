@@ -7,9 +7,10 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
-#define IP "127.0.0.1"
+// definicao de constantes
+#define PORT 8080         // porta em que o servidor escutara
+#define BUFFER_SIZE 1024  // tamanho do buffer para comunicacao
+#define IP "127.0.0.1"    // endereço IP do servidor
 
 std::string name_client;
 std::string header = R"(
@@ -29,5 +30,7 @@ Comandos
 -----------------------------------------------------------------------
 
 )";
+
+// funcoes utilizadas
 void send_messages(int client_socket);
 void receive_messages(int client_socket);

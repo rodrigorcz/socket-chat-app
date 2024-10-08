@@ -10,26 +10,26 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <map>
+#include <atomic>
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
-#define MAX_CLIENTS 8
+// definicao de constantes
+#define PORT 8080         // porta em que o servidor escutara
+#define BUFFER_SIZE 1024  // tamanho do buffer para comunicacao
+#define MAX_CLIENTS 8     // numero maximo de clientes conectados
 
-int style = 0;
+// Variavel para ANSI codes no terminal (cores e estilos): 1 = ativado; 0 = desativado
+int style = 1; 
 
-int current_clients = 0;
-std::mutex mutex_clt;
+int current_clients = 0;  // Contador de clientes conectados
+std::mutex mutex_clt;     // Mutex para proteção de acesso a recursos compartilhados
+std::atomic<bool> running(true);
 
-std::vector<int> clients_list;
+std::vector<int> clients_list; // Lista de clientes conectados
 
-// hash (key: client_socket, value: bool (esta no chat privado))
-std::map<int, bool> privates_chats;
-
-// hash (key: client_name, value: client_socket)
-std::map<std::string, int> clients_info;
-
-// hash (key: client_socket, value: client_name) 
-std::map<int, std::string> clients_networking; 
+// Mapeamentos de informações de clientes 
+std::map<int, bool> privates_chats;            //(key: client_socket, value: bool (esta no chat privado))
+std::map<std::string, int> clients_info;       //(key: client_name  , value: client_socket)
+std::map<int, std::string> clients_networking; //(key: client_socket, value: client_name) 
 
 std::string header = R"(
 -----------------------------------------------------------------------
@@ -41,6 +41,7 @@ std::string header = R"(
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝                 ╚═╝  ╚═╝╚═╝     ╚═╝     
 -----------------------------------------------------------------------)";
 
+// vetor de cores pre estabelecidas
 std::vector<std::string> colors = {
     "\033[38;5;196m[",  // Vermelho
     "\033[38;5;202m[",  // Laranja
@@ -52,6 +53,7 @@ std::vector<std::string> colors = {
     "\033[38;5;244m["   // Cinza
 };
 
+// funcoes utilizadas
 void rotine_client(int client_socket);
 bool process_command(std::string buffer, int client_socket);
 void send_whisper(std::string buffer, int client_socket);
