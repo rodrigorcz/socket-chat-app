@@ -1,34 +1,26 @@
 # Chat System
 
-Este projeto é um sistema de chat em C++ que utiliza sockets para comunicação entre servidor e cliente.
+This project is a chat system in C++ that uses sockets for communication between the server and clients.
 
-## Membros do Grupo
-- Marcus Vinicius da Silva - NUSP: 13833150
-- Rodrigo Rodrigues de Castro - NUSP: 13695362
-- Karine Cerqueira Nascimento - NUSP: 13718404
-- André Jacob Suaide - NUSP: 13864673
+![Screenshot From 2025-01-15 14-33-20](https://github.com/user-attachments/assets/11f4a0ed-f70d-4091-ad15-d2cd1e8a7762)
 
-## Informações do Sistema
-- Linux Kernel 6.8.0
-- Sistema Operacional: Ubuntu 24.04 LTS LTS
-- Compilador utilizado: g++ 11.3.0
 
-## Instruções de Compilação e Execução
+## Compilation and Execution Instructions
 
-### Compilação
-Para compilar o projeto, execute o comando:
+### Compilation
+To compile the project, run the command:
 
 ```
 $ make all
 ```
 
-Com isso, será necessário rodar um programa para o servidor e o restante para os clientes:
+Then, you need to start the server program and run separate programs for each client:
 
 ```
 $ ./server
 ```
 
-Em seguida roda o programa para cada cliente requisitado
+Next, start the program for each required client:
 
 ```
 $ ./client 
@@ -37,22 +29,23 @@ $ ./client
 ...
 ```
 
-## Estrutura do Projeto
-- `src/server.cpp`: Implementação do servidor.
-- `src/server.hpp`: Cabeçalhos e definições usadas pelo servidor.
-- `src/client.cpp`: Implementação do cliente.
-- `src/client.hpp`: Cabeçalhos e definições usadas pelo cliente.
+## Project Structure
+- `src/server.cpp`: Server implementation.
+- `src/server.hpp`: Headers and definitions used by the server.
+- `src/client.cpp`: Client implementation.
+- `src/client.hpp`: Headers and definitions used by the client.
 
-## Observações Adicionais
-- Este projeto utiliza ANSI escape code para customizar as saidas no terminal, com cores e estilos. Exite uma variavel `style = 1` em `server.hpp` para remover o uso de estilo é so configurar essa varivael com `0`. 
+## Additional Notes
+- This project uses ANSI escape codes to customize terminal output with colors and styles. There is a variable `style = 1` in `server.hpp`. To disable styles, set this variable to `0`.
 
-- Este projeto utiliza multithreading para gerenciar conexões com múltiplos clientes, suportando no maximo 8 clientes. Para aumentar o numero de clientes deve-se mudar a constante `MAX_CLIENTS` em `server.hpp`, mas deve-se adaptar o restante do código.
+- This project employs multithreading to manage connections with multiple clients, supporting up to 8 clients by default. To increase the number of clients, you need to modify the `MAX_CLIENTS` constant in `server.hpp` and adapt the rest of the code accordingly.
 
-- O chat privado é implementado com um mecanismo de comandos para mensagens, o cliente pode executar 4 comandos:
+- Private chat functionality is implemented with a command mechanism for messages. Clients can use the following four commands:
 
 ```
-\a mensagem : Envia uma mensagem global anonima
-\p usuario : Entra em um chat privado com usuario
-\w usuario mensagem : Envia um sussuro para um usuario
-\exit : Sair do chat
+\a mesage :  Sends a global anonymous message
+\p user : Initiates a private chat with the user
+\w user mensagem : Sends a whisper to the user 
+\exit : Exits the chat
 ```
+
