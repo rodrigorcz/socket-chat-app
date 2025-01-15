@@ -40,10 +40,12 @@ $ ./client
 
 - This project employs multithreading to manage connections with multiple clients, supporting up to 8 clients by default. To increase the number of clients, you need to modify the `MAX_CLIENTS` constant in `server.hpp` and adapt the rest of the code accordingly.
 
+- The messages and comments used are in Portuguese/BR
+  
 - Private chat functionality is implemented with a command mechanism for messages. Clients can use the following four commands:
 
 ```
-\a mesage :  Sends a global anonymous message
+\a message :  Sends a global anonymous message
 \p user : Initiates a private chat with the user
 \w user mensagem : Sends a whisper to the user 
 \exit : Exits the chat
